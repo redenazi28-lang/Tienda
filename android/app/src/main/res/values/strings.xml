@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Nombre que se ve debajo del icono -->
+    <string name="app_name">Mathi Net</string>
+
+    <!-- Opcional: direccion web de la tienda (por ejemplo https://mathinet.shop).
+         Vacio = la app muestra la tienda guardada adentro (assets/index.html) y funciona sin internet.
+         Con una direccion = la app carga esa pagina y, si no hay internet, muestra la guardada. -->
+    <string name="remote_url" translatable="false">https://mathinet.shop/</string>
+</resources>

@@ -1,0 +1,40 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.mathinet.tienda'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'com.mathinet.tienda'   // identificador unico de la app
+        minSdk 23
+        targetSdk 34
+        versionCode 1                          // subir en 1 con cada version nueva
+        versionName '1.0'
+    }
+
+    signingConfigs {
+        mathinet {
+            storeFile file('mathinet.keystore')
+            storePassword 'android'
+            keyAlias 'mathinet'
+            keyPassword 'android'
+        }
+    }
+
+    buildTypes {
+        debug {
+            signingConfig signingConfigs.mathinet
+        }
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.mathinet
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
