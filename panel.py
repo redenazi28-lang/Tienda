@@ -604,6 +604,8 @@ def a_settings(me, d):
     x("INSERT OR REPLACE INTO settings VALUES('brand',?)", (text(d, "brand", 24) or "Mi Panel SSH",))
     x("INSERT OR REPLACE INTO settings VALUES('price',?)", (str(num(d, "price", 0, 100000000, "El precio")),))
     x("INSERT OR REPLACE INTO settings VALUES('defDays',?)", (str(num(d, "defDays", 1, 365, "Los días por defecto")),))
+    ports = re.sub(r"[^0-9, ]", "", text(d, "ports", 40)).strip(" ,") or "80"
+    x("INSERT OR REPLACE INTO settings VALUES('ports',?)", (ports,))
     x("INSERT OR REPLACE INTO settings VALUES('trialsPerDay',?)", (str(num(d, "trialsPerDay", 0, 1000, "Las pruebas por día")),))
     return {}
 
@@ -653,7 +655,7 @@ def state(me):
                 "online": STATUS.get(c["server_id"], {}).get("online", {}).get(c["user"], 0)} for c in rows]
     out = {"me": {"id": me["id"], "username": me["username"], "name": me["name"], "role": me["role"], "credits": me["credits"]},
            "brand": setting("brand", "Mi Panel SSH"), "defDays": int(setting("defDays", "30")),
-           "trialsPerDay": int(setting("trialsPerDay", "5")), "today": today().isoformat(),
+           "trialsPerDay": int(setting("trialsPerDay", "5")), "ports": setting("ports", "80"), "today": today().isoformat(),
            "servers": servers, "clients": clients}
     if admin:
         out["price"] = int(setting("price", "3500"))

@@ -6,7 +6,7 @@ U=https://raw.githubusercontent.com/redenazi28-lang/Tienda/panel-ssh
 D=/root/panelvpn
 mkdir -p "$D"
 echo "==> Descargando el panel"
-for f in panel.py index.html install.sh LEEME.txt; do
+for f in panel.py index.html install.sh ws.py LEEME.txt; do
   if command -v curl >/dev/null 2>&1; then curl -fsSL "$U/$f" -o "$D/$f"
   else wget -q -O "$D/$f" "$U/$f"; fi
 done

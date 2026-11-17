@@ -404,7 +404,7 @@ function vMas(){
       '<div class="row"><button class="btn sm pri" data-act="credits" data-id="'+r.id+'">Cargar créditos</button><button class="btn sm" data-act="rslPass" data-id="'+r.id+'">Cambiar clave</button><button class="btn sm" data-act="toggleReseller" data-id="'+r.id+'">'+(r.suspended?"Activar":"Suspender")+'</button><button class="btn sm danger" data-act="delReseller" data-id="'+r.id+'">Eliminar</button></div></article>'}).join(""):'<div class="empty">Todavía no tenés revendedores.</div>')+'</div></section>'+
     '<section class="card"><h2>Tu panel</h2><div class="f"><label for="aBrand">Nombre del panel</label><input id="aBrand" value="'+esc(S.brand)+'" maxlength="24"></div>'+
     '<div class="f2"><div class="f"><label for="aPrice">Precio por mes ($)</label><input id="aPrice" type="number" min="0" value="'+S.price+'" inputmode="numeric"></div><div class="f"><label for="aDays">Días por defecto</label><input id="aDays" type="number" min="1" max="365" value="'+S.defDays+'" inputmode="numeric"></div></div>'+
-    '<div class="f"><label for="aTrials">Pruebas gratis por día para cada revendedor</label><input id="aTrials" type="number" min="0" value="'+S.trialsPerDay+'" inputmode="numeric"></div>'+
+    '<div class="f"><label for="aPorts">Puertos para clientes (se muestran en Copiar datos)</label><input id="aPorts" value="'+esc(S.ports)+'" placeholder="80, 443" inputmode="numeric"></div><div class="f"><label for="aTrials">Pruebas gratis por día para cada revendedor</label><input id="aTrials" type="number" min="0" value="'+S.trialsPerDay+'" inputmode="numeric"></div>'+
     '<div class="row"><button class="btn pri" data-act="saveCfg">Guardar</button></div></section>';
   }else{
     h+='<section class="card"><h2>Tus créditos</h2><div class="tile '+(S.me.credits?"acc":"warn")+'" style="border-radius:10px"><span class="k">Disponibles</span><span class="v num">'+S.me.credits+'</span></div><div class="sub">1 crédito = 30 días de una conexión. Las cargas las hace el administrador.</div></section>';
@@ -458,7 +458,7 @@ document.addEventListener("click",function(e){
    case "toggleClient":c=cli(id);act(function(){return api("client/suspend",{id:c.id,on:!c.suspended})},c.user+(c.suspended?" activado":" suspendido y desconectado"));break;
    case "delClient":c=cli(id);confirmDo("Eliminar cliente","Se borra la cuenta <b class=\"mono\">"+esc(c.user)+"</b> del panel y del servidor. No se puede deshacer.","Eliminar",async function(){await api("client/delete",{id:c.id});toast("Cliente eliminado")});break;
    case "copy":c=cli(id);s=srv(c.server);
-     copyText(S.brand+"\nUsuario: "+c.user+"\nContraseña: "+(c.pass||"(no registrada)")+(s&&s.host&&s.host!=="local"?"\nHost: "+s.host+"\nPuerto SSH: "+s.port:"")+"\nConexiones: "+c.limit+"\nVence: "+fdate(c.exp),"Datos de "+c.user,"Datos copiados");break;
+     copyText(S.brand+"\nUsuario: "+c.user+"\nContraseña: "+(c.pass||"(no registrada)")+(s&&s.host&&s.host!=="local"?"\nHost: "+s.host:"")+"\nPuertos: "+S.ports+"\nConexiones: "+c.limit+"\nVence: "+fdate(c.exp),"Datos de "+c.user,"Datos copiados");break;
    case "newServer":newServerForm();break;
    case "editServer":editServerForm(srv(id));break;
    case "reconnect":reconnectForm(srv(id));break;
@@ -470,7 +470,7 @@ document.addEventListener("click",function(e){
    case "rslPass":r=rsl(id);sheet("Clave de "+r.name,'<div class="f"><label for="pNew">Contraseña nueva (8 o más)</label><input id="pNew" class="mono" value="'+genPass()+genPass().slice(0,2)+'" autocomplete="off"></div>',"Cambiar clave",async function(){await api("reseller/password",{id:r.id,password:$("#pNew").value});toast("Clave cambiada")});break;
    case "toggleReseller":r=rsl(id);act(function(){return api("reseller/suspend",{id:r.id,on:!r.suspended})},r.name+(r.suspended?" activado":" suspendido"));break;
    case "delReseller":r=rsl(id);confirmDo("Eliminar revendedor","Se borra <b>"+esc(r.name)+"</b>. Sus clientes siguen funcionando y pasan a ser tuyos.","Eliminar",async function(){await api("reseller/delete",{id:r.id});toast("Revendedor eliminado")});break;
-   case "saveCfg":act(function(){return api("settings",{brand:$("#aBrand").value,price:$("#aPrice").value,defDays:$("#aDays").value,trialsPerDay:$("#aTrials").value})},"Ajustes guardados");break;
+   case "saveCfg":act(function(){return api("settings",{brand:$("#aBrand").value,price:$("#aPrice").value,defDays:$("#aDays").value,trialsPerDay:$("#aTrials").value,ports:$("#aPorts").value})},"Ajustes guardados");break;
    case "myPass":sheet("Cambiar contraseña",'<div class="f"><label for="pOld">Contraseña actual</label><input id="pOld" type="password" autocomplete="current-password"></div><div class="f"><label for="pNew2">Contraseña nueva (8 o más)</label><input id="pNew2" type="password" autocomplete="new-password"></div>',"Cambiar",async function(){await api("password",{old:$("#pOld").value,"new":$("#pNew2").value});toast("Contraseña cambiada")});break;
    case "logout":api("logout",{}).then(showLogin,showLogin);break;
   }
