@@ -23,7 +23,7 @@ DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 LOCAL = ("local", "localhost", "127.0.0.1")
 P = "PATH=/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin; "
 SAFE_SHELLS = ("/bin/false", "/usr/bin/false", "/usr/sbin/nologin", "/sbin/nologin")
-SESS_COMM = ("sshd", "sshd-session")
+SESS_COMM = ("sshd", "sshd-session", "dropbear")
 NOEXP = "2099-12-31"
 
 DBLOCK = threading.RLock()
@@ -363,7 +363,8 @@ def a_client_create(me, d):
             lim = 1
         charge(me, cost)
     exp = (today() + datetime.timedelta(days=days)).isoformat()
-    must(s, P + sh("useradd", "-M", "-N", "-s", "/bin/false", "-e", exp, user) + " && chpasswd",
+    must(s, P + "(grep -qx /bin/false /etc/shells || echo /bin/false >> /etc/shells); "
+         + sh("useradd", "-M", "-N", "-s", "/bin/false", "-e", exp, user) + " && chpasswd",
          "%s:%s\n" % (user, pw), "crear la cuenta")
     x("INSERT INTO clients(user,pass,server_id,exp,lim,owner,note,trial,created) VALUES(?,?,?,?,?,?,?,?,?)",
       (user, pw, s["id"], exp, lim, None if me["role"] == "admin" else me["id"], text(d, "note"), trial, int(time.time())))
