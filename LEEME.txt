@@ -1,0 +1,63 @@
+PANEL VPN
+=========
+
+Qué hace
+--------
+Administra cuentas SSH (usuarios de Linux sin consola) en uno o varios VPS. Es solo para SSH:
+crear, renovar, suspender, borrar, límite de conexiones, vencimientos,
+revendedores con créditos y vista en vivo de quién está conectado.
+
+Requisitos
+----------
+- Un VPS con Ubuntu o Debian y acceso root.
+- Cuenta las conexiones de OpenSSH (sshd). No cuenta Dropbear, V2Ray ni WireGuard.
+
+Instalar
+--------
+1. Subí panelvpn.zip al VPS (por SFTP, o con: scp panelvpn.zip root@IP:/root/).
+2. Entrá al VPS por SSH y ejecutá:
+
+     apt install -y unzip
+     unzip panelvpn.zip -d panelvpn
+     sudo bash panelvpn/install.sh
+
+3. Al terminar muestra la dirección (https://IP:8443), el usuario admin y la
+   contraseña. Anotala.
+4. Abrí esa dirección en el navegador. Va a avisar que el certificado no es de
+   confianza porque lo generó el propio panel: Avanzado > Continuar.
+
+El VPS donde instalás el panel ya aparece cargado como "Este VPS".
+
+Agregar tu VPS
+--------------
+Servidores > + Agregar VPS. Completá:
+  Nombre, Categoría, IP o dominio, Puerto SSH, Usuario (root) y Contraseña de root.
+El panel entra una sola vez con la contraseña, deja su llave en el VPS y no
+guarda la contraseña. Si algo falla, te dice exactamente qué:
+  - contraseña incorrecta o el VPS no deja entrar a root con contraseña
+    (te muestra el comando para habilitarlo),
+  - puerto cerrado,
+  - IP que no responde o firewall del proveedor.
+Si reinstalás un VPS o le cambiás el puerto, usá "Reconectar" en ese VPS.
+Las cuentas SSH que ya tenía las podés traer con "Importar cuentas".
+
+Cosas útiles
+------------
+Ver si está corriendo:      systemctl status panelvpn
+Reiniciar:                  systemctl restart panelvpn
+Ver errores:                journalctl -u panelvpn -n 50
+Cambiar el puerto:          PANEL_PORT=9443 bash install.sh
+Olvidé la clave de admin:   echo 'ClaveNueva123' | PANEL_DATA=/var/lib/panelvpn python3 /opt/panelvpn/panel.py --reset-admin
+Copia de seguridad:         guardá /var/lib/panelvpn/panel.db
+Actualizar:                 volvé a correr install.sh (no borra datos)
+Desinstalar:                systemctl disable --now panelvpn; rm -rf /opt/panelvpn /etc/systemd/system/panelvpn.service
+                            (los datos quedan en /var/lib/panelvpn)
+
+Seguridad
+---------
+- El panel corre como root porque crea y borra usuarios del sistema. Usá una
+  contraseña de admin larga y no compartas la dirección.
+- Solo toca cuentas que creó o importó, y nunca usuarios del sistema (uid < 1000).
+- Las contraseñas de los clientes VPN se guardan en /var/lib/panelvpn/panel.db
+  (solo root puede leerlo) para poder mostrarlas en "Copiar datos".
+- La primera vez que conecta a un VPS confía en su huella SSH y la recuerda.

@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Panel SSH</title>
+<style>
+/* Layout: consola de operador. Barra lateral en escritorio, barra inferior en celular; resumen arriba, listas operables abajo. */
+:root{
+  --bg:#edf1f3; --surface:#ffffff; --surface2:#f4f7f8; --ink:#122028; --muted:#586a74; --line:#d5dde1;
+  --accent:#0b7f7a; --accent-ink:#ffffff; --accent-soft:#d8eeec;
+  --ok:#1b8349; --ok-soft:#dcf2e5; --warn:#a86200; --warn-soft:#fbecd0; --crit:#c0342d; --crit-soft:#fbdfdc; --info:#2a5fc0; --info-soft:#dfe9fb;
+  --display:ui-rounded,"Segoe UI Variable Display","Segoe UI",system-ui,-apple-system,Roboto,sans-serif;
+  --body:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --mono:ui-monospace,"Roboto Mono",Menlo,Consolas,monospace;
+  --r:14px;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#0c1519; --surface:#132026; --surface2:#182a31; --ink:#e6eef1; --muted:#8fa3ad; --line:#263a42;
+    --accent:#3ccfc2; --accent-ink:#04201e; --accent-soft:#113b3a;
+    --ok:#4fd08a; --ok-soft:#123524; --warn:#f0b24a; --warn-soft:#3a2a0c; --crit:#ff7a70; --crit-soft:#41191a; --info:#7fa9ff; --info-soft:#172a4d;
+    color-scheme:dark;
+  }
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font:400 15px/1.45 var(--body);-webkit-font-smoothing:antialiased}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+button:disabled{opacity:.55;cursor:default}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+h1,h2,h3{font-family:var(--display);margin:0;text-wrap:balance;letter-spacing:-.01em}
+[hidden]{display:none!important}
+.mono{font-family:var(--mono)}
+.num{font-variant-numeric:tabular-nums}
+
+.app{display:flex;height:100%}
+.side{display:none;flex-direction:column;gap:6px;width:228px;padding:20px 14px;border-right:1px solid var(--line);background:var(--surface)}
+.brand{display:flex;align-items:center;gap:10px;padding:4px 8px 18px}
+.brand b{font:700 18px var(--display);overflow-wrap:anywhere}
+.logo{width:32px;height:32px;border-radius:9px;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;flex:none}
+.nav-btn{display:flex;align-items:center;gap:10px;border:0;background:none;padding:10px 12px;border-radius:10px;color:var(--muted);font-weight:500;text-align:left}
+.nav-btn svg{width:20px;height:20px;flex:none}
+.nav-btn[aria-current="page"]{background:var(--accent-soft);color:var(--accent)}
+.side .nav-btn:hover{color:var(--ink)}
+main{flex:1;min-width:0;overflow-y:auto;padding:18px 16px 96px}
+.wrap{max-width:980px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.top h1{font-size:26px}
+.sub{color:var(--muted);font-size:13px}
+.bottom{position:fixed;left:0;right:0;bottom:0;display:flex;background:var(--surface);border-top:1px solid var(--line);padding:6px 6px 10px;z-index:5}
+.bottom .nav-btn{flex:1;flex-direction:column;gap:3px;font-size:11px;padding:6px 2px;align-items:center}
+@media(min-width:860px){.side{display:flex}.bottom{display:none}main{padding:28px 28px 40px}}
+
+.btn{border:1px solid var(--line);background:var(--surface);padding:9px 14px;border-radius:10px;font-weight:600;font-size:14px;display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:40px}
+.btn:hover{border-color:var(--muted)}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.danger{color:var(--crit)}
+.btn.sm{padding:6px 10px;min-height:34px;font-size:13px;border-radius:8px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+
+.tiles{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+@media(min-width:700px){.tiles{grid-template-columns:repeat(5,1fr)}.tiles.four{grid-template-columns:repeat(4,1fr)}}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;display:flex;flex-direction:column;gap:2px;border-left:4px solid var(--line)}
+.tile.ok{border-left-color:var(--ok)}.tile.warn{border-left-color:var(--warn)}.tile.crit{border-left-color:var(--crit)}.tile.acc{border-left-color:var(--accent)}
+.tile .k{font-size:12px;color:var(--muted)}
+.tile .v{font:700 26px/1.1 var(--display)}
+.tile.wide{grid-column:span 2}
+@media(min-width:700px){.tile.wide{grid-column:span 1}}
+
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;display:flex;flex-direction:column;gap:12px}
+.card h2{font-size:17px}
+.two{display:grid;gap:18px}
+@media(min-width:860px){.two{grid-template-columns:1.1fr 1fr}}
+
+.alert{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-radius:10px;font-size:14px}
+.alert .dot{width:8px;height:8px;border-radius:50%;margin-top:7px;flex:none}
+.alert.crit{background:var(--crit-soft)}.alert.crit .dot{background:var(--crit)}
+.alert.warn{background:var(--warn-soft)}.alert.warn .dot{background:var(--warn)}
+.alert.info{background:var(--info-soft)}.alert.info .dot{background:var(--info)}
+.alert.ok{background:var(--ok-soft)}.alert.ok .dot{background:var(--ok)}
+
+.bars{display:flex;align-items:flex-end;gap:4px;height:110px;border-bottom:1px solid var(--line);padding-top:16px}
+.bar{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:3px;height:100%;font-size:11px;color:var(--muted)}
+.bar i{display:block;width:100%;border-radius:4px 4px 0 0;background:var(--accent);min-height:2px}
+.bar.soon i{background:var(--warn)}
+.bar.zero i{background:var(--line)}
+.barlab{display:flex;gap:4px;font-size:10px;color:var(--muted)}
+.barlab span{flex:1;text-align:center}
+
+.pill{display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border-radius:99px;font-size:12px;font-weight:600;white-space:nowrap}
+.pill.ok{background:var(--ok-soft);color:var(--ok)}.pill.warn{background:var(--warn-soft);color:var(--warn)}
+.pill.crit{background:var(--crit-soft);color:var(--crit)}.pill.mut{background:var(--surface2);color:var(--muted);border:1px solid var(--line)}
+.pill.info{background:var(--info-soft);color:var(--info)}
+.tag{font:500 11px var(--mono);padding:2px 6px;border-radius:5px;background:var(--surface2);border:1px solid var(--line);color:var(--muted)}
+.live{width:8px;height:8px;border-radius:50%;background:var(--ok);display:inline-block;flex:none}
+.live.off{background:var(--line)}
+
+.search{flex:1;min-width:180px;border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:9px 12px;min-height:40px}
+.chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px}
+.chip{border:1px solid var(--line);background:var(--surface);border-radius:99px;padding:6px 12px;font-size:13px;font-weight:500;white-space:nowrap;color:var(--muted)}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.list{display:flex;flex-direction:column;gap:10px}
+.item{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;display:flex;flex-direction:column;gap:10px}
+.item .head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap}
+.item .name{font-weight:600;font-size:16px;display:flex;align-items:center;gap:8px;overflow-wrap:anywhere}
+.meta{display:flex;gap:6px 14px;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+.meta b{color:var(--ink);font-weight:500}
+.meter{height:6px;border-radius:99px;background:var(--surface2);border:1px solid var(--line);overflow:hidden}
+.meter i{display:block;height:100%;background:var(--accent)}
+.meter.hot i{background:var(--warn)}
+.empty{padding:28px 16px;text-align:center;color:var(--muted);border:1px dashed var(--line);border-radius:var(--r)}
+
+.ov{position:fixed;inset:0;background:rgba(5,14,18,.6);display:none;align-items:flex-end;justify-content:center;z-index:20}
+.ov.on{display:flex}
+@media(min-width:700px){.ov{align-items:center}}
+.sheet{background:var(--surface);width:100%;max-width:500px;max-height:94%;overflow-y:auto;border-radius:18px 18px 0 0;padding:18px 16px 22px;display:flex;flex-direction:column;gap:14px}
+@media(min-width:700px){.sheet{border-radius:18px}}
+.sheet h2{font-size:20px}
+.f{display:flex;flex-direction:column;gap:5px;min-width:0}
+.f label,.f .lab{font-size:13px;font-weight:500;color:var(--muted)}
+.f input,.f select,.f textarea{border:1px solid var(--line);background:var(--surface2);border-radius:10px;padding:10px 12px;min-height:42px;width:100%}
+.f2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.f21{display:grid;grid-template-columns:2fr 1fr;gap:10px}
+.f12{display:grid;grid-template-columns:1fr 2fr;gap:10px}
+.hint{font-size:12px;color:var(--muted)}
+.err{color:var(--crit);font-size:13px;font-weight:500;min-height:1em}
+.seg{display:flex;background:var(--surface2);border:1px solid var(--line);border-radius:10px;padding:3px;gap:3px}
+.seg label{flex:1;text-align:center;padding:8px 6px;border-radius:8px;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;position:relative}
+.seg input{position:absolute;opacity:0;width:1px;height:1px;min-height:0;padding:0;border:0}
+.seg label:has(input:checked){background:var(--surface);color:var(--ink);box-shadow:0 0 0 1px var(--line)}
+.seg label:has(input:focus-visible){outline:2px solid var(--accent)}
+.toast{position:fixed;left:50%;bottom:86px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-size:14px;font-weight:500;z-index:30;opacity:0;pointer-events:none;transition:opacity .2s;max-width:90%}
+.toast.on{opacity:1}
+@media (prefers-reduced-motion: reduce){.toast{transition:none}}
+pre.code{margin:0;background:var(--surface2);border:1px solid var(--line);border-radius:10px;padding:12px;font:400 12px/1.5 var(--mono);white-space:pre-wrap;overflow-wrap:anywhere}
+.login{height:100%;display:grid;place-items:center;padding:16px}
+.login .card{width:100%;max-width:360px;gap:16px;padding:22px}
+</style>
+</head>
+<body>
+<div class="login" id="login" hidden>
+  <form class="card" id="lf" novalidate>
+    <div class="brand" style="padding:0"><span class="logo"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 4.5-3.2 7.8-8 9-4.8-1.2-8-4.5-8-9V6z"/><path d="M9 12l2 2 4-4"/></svg></span><b>Panel SSH</b></div>
+    <div class="f"><label for="lUser">Usuario</label><input id="lUser" autocomplete="username" autocapitalize="off"></div>
+    <div class="f"><label for="lPass">Contraseña</label><input id="lPass" type="password" autocomplete="current-password"></div>
+    <div class="err" id="lErr" role="alert"></div>
+    <button class="btn pri" type="submit">Entrar</button>
+  </form>
+</div>
+<div class="app" id="app" hidden>
+  <nav class="side" id="side" aria-label="Secciones"></nav>
+  <main id="main"><div class="wrap" id="view"></div></main>
+</div>
+<nav class="bottom" id="bottom" aria-label="Secciones" hidden></nav>
+<div class="ov" id="ov"><div class="sheet" id="sheet" role="dialog" aria-modal="true"></div></div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(function(){
+"use strict";
+var DAY=864e5, NOEXP="2099-12-31";
+var $=function(s,r){return (r||document).querySelector(s)};
+function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})}
+function genPass(){var a="abcdefghjkmnpqrstuvwxyz23456789",s="",b=new Uint8Array(8);crypto.getRandomValues(b);for(var i=0;i<8;i++)s+=a[b[i]%a.length];return s}
+function fdate(s){return s===NOEXP?"sin fecha":s.split("-").reverse().join("/")}
+function money(n){return "$ "+Math.round(n).toLocaleString("es-AR")}
+
+var IC={
+ inicio:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/></svg>',
+ clientes:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.6-3.6 3.2-5.5 6.5-5.5s5.9 1.9 6.5 5.5"/><path d="M16 4.8a3.5 3.5 0 010 6.4M18.5 14.8c1.7.8 2.7 2.6 3 5.2"/></svg>',
+ vivo:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2.5-7 5 14L17 12h4"/></svg>',
+ servidores:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 7.5h.01M7 16.5h.01"/></svg>',
+ mas:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>',
+ shield:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 4.5-3.2 7.8-8 9-4.8-1.2-8-4.5-8-9V6z"/><path d="M9 12l2 2 4-4"/></svg>'
+};
+var S=null, tab="inicio", filt="todos", q="", timer=null;
+function isAdmin(){return S&&S.me.role==="admin"}
+function tabs(){return isAdmin()?[["inicio","Inicio"],["clientes","Clientes"],["vivo","En vivo"],["servidores","Servidores"],["mas","Más"]]:[["inicio","Inicio"],["clientes","Clientes"],["vivo","En vivo"],["mas","Más"]]}
+
+/* ---------- conexión con el panel ---------- */
+async function api(path,body){
+  var r;
+  try{r=await fetch("/api/"+path,{method:body?"POST":"GET",credentials:"same-origin",headers:{"Content-Type":"application/json","X-Requested-With":"panel"},body:body?JSON.stringify(body):undefined})}
+  catch(e){throw new Error("No hay conexión con el panel.")}
+  var j={};try{j=await r.json()}catch(e){}
+  if(r.status===401&&path!=="login"){showLogin();throw new Error(j.error||"Iniciá sesión de nuevo.")}
+  if(!r.ok)throw new Error(j.error||("Error "+r.status));
+  return j;
+}
+function showLogin(){S=null;clearInterval(timer);timer=null;closeSheet();$("#app").hidden=true;$("#bottom").hidden=true;$("#login").hidden=false}
+function showApp(){$("#login").hidden=true;$("#app").hidden=false;$("#bottom").hidden=false;if(!timer)timer=setInterval(function(){refresh(false)},5000)}
+async function refresh(force){
+  try{S=await api("state")}catch(e){return}
+  if(!tabs().some(function(t){return t[0]===tab}))tab="inicio";
+  if($("#ov").classList.contains("on"))return;
+  var ae=document.activeElement;
+  if(!force&&ae&&$("#view").contains(ae)&&/INPUT|SELECT|TEXTAREA/.test(ae.tagName)){if(tab==="clientes")drawClients();return}
+  render();
+}
+async function act(fn,msg){try{await fn();if(msg)toast(msg);await refresh(true)}catch(e){toast(e.message)}}
+
+/* ---------- datos derivados ---------- */
+function daysLeft(c){return Math.round((Date.parse(c.exp)-Date.parse(S.today))/DAY)}
+function st(c){if(c.suspended)return "sus";var d=daysLeft(c);return d<=0?"ven":d<=3?"pv":"act"}
+function byId(a,id){for(var i=0;i<a.length;i++)if(String(a[i].id)===String(id))return a[i];return null}
+function srv(id){return byId(S.servers,id)}
+function cli(id){return byId(S.clients,id)}
+function rsl(id){return byId(S.resellers||[],id)}
+function pillFor(c){var s=st(c),d=daysLeft(c);
+  if(s==="sus")return '<span class="pill mut">Suspendido</span>';
+  if(s==="ven")return '<span class="pill crit">Vencido</span>';
+  if(s==="pv")return '<span class="pill warn">Vence en '+d+(d===1?" día":" días")+'</span>';
+  if(c.exp===NOEXP)return '<span class="pill mut">Sin vencimiento</span>';
+  return '<span class="pill ok">'+d+' días</span>'}
+function toast(m){var t=$("#toast");t.textContent=m;t.classList.add("on");clearTimeout(toast.t);toast.t=setTimeout(function(){t.classList.remove("on")},2600)}
+
+function nav(){
+  var h=tabs().map(function(t){return '<button class="nav-btn" data-tab="'+t[0]+'"'+(tab===t[0]?' aria-current="page"':'')+'>'+IC[t[0]]+'<span>'+t[1]+'</span></button>'}).join("");
+  $("#side").innerHTML='<div class="brand"><span class="logo">'+IC.shield+'</span><b>'+esc(S.brand)+'</b></div>'+h;
+  $("#bottom").innerHTML=h;
+  document.title=S.brand;
+}
+function render(){
+  if(!S)return;
+  nav();
+  $("#view").innerHTML={inicio:vInicio,clientes:vClientes,vivo:vVivo,servidores:vServidores,mas:vMas}[tab]();
+  if(tab==="clientes")drawClients();
+}
+function head(t,sub,btn){return '<div class="top"><div><h1>'+t+'</h1>'+(sub?'<div class="sub">'+sub+'</div>':'')+'</div>'+(btn||'')+'</div>'}
+
+/* ---------- Inicio ---------- */
+function vInicio(){
+  var A=isAdmin(),act=0,pv=0,ven=0,on=0,nuevos=[],porV=[],now=Date.now()/1000;
+  S.clients.forEach(function(c){var s=st(c);if(s==="act"||s==="pv")act++;if(s==="pv"){pv++;porV.push(c)}if(s==="ven")ven++;on+=c.online;if(now-c.created<2*86400)nuevos.push(c)});
+  var down=S.servers.filter(function(x){return x.known&&!x.up});
+  var al=[];
+  down.forEach(function(x){al.push(["crit","Servidor caído: <b>"+esc(x.name)+"</b>"+(x.err?" ("+esc(x.err)+")":"")])});
+  if(ven)al.push(["warn","<b>"+ven+"</b> "+(ven===1?"cliente vencido":"clientes vencidos")+" sin renovar"]);
+  porV.sort(function(a,b){return a.exp<b.exp?-1:1}).forEach(function(c){var d=daysLeft(c);al.push(["warn","<b>"+esc(c.user)+"</b> vence "+(d<=1?"mañana":"en "+d+" días")])});
+  nuevos.slice(0,6).forEach(function(c){al.push(["info","Cliente nuevo: <b>"+esc(c.user)+"</b>"])});
+  if(A)S.resellers.forEach(function(r){if(!r.suspended&&r.credits===0)al.push(["info","<b>"+esc(r.name)+"</b> se quedó sin créditos"])});
+  if(!A&&S.me.credits===0)al.push(["warn","Te quedaste sin créditos. Pedile una carga al administrador."]);
+  if(!al.length)al.push(["ok","Todo en orden. Sin vencimientos cercanos ni servidores caídos."]);
+  var cnt=[],mx=1,i;for(i=0;i<14;i++)cnt[i]=0;
+  S.clients.forEach(function(c){if(c.suspended)return;var d=daysLeft(c);if(d>=1&&d<=14){cnt[d-1]++;if(cnt[d-1]>mx)mx=cnt[d-1]}});
+  var bars="",labs="",t0=Date.parse(S.today);for(i=0;i<14;i++){var dt=new Date(t0+(i+1)*DAY);
+    bars+='<div class="bar'+(cnt[i]?(i<3?" soon":""):" zero")+'"><span class="num">'+(cnt[i]||"")+'</span><i style="height:'+(cnt[i]?Math.round(cnt[i]/mx*70):2)+'px"></i></div>';
+    labs+='<span class="num">'+dt.getUTCDate()+'</span>'}
+  return head("Resumen",esc(S.me.name)+" · "+fdate(S.today),'<button class="btn pri" data-act="newClient">+ Nuevo cliente</button>')+
+  '<div class="tiles'+(A?"":" four")+'">'+
+   '<div class="tile ok"><span class="k">Clientes activos</span><span class="v num">'+act+'</span></div>'+
+   '<div class="tile acc"><span class="k">Conexiones ahora</span><span class="v num">'+on+'</span></div>'+
+   '<div class="tile '+(pv?"warn":"")+'"><span class="k">Vencen en 3 días</span><span class="v num">'+pv+'</span></div>'+
+   (A?'<div class="tile '+(down.length?"crit":"ok")+'"><span class="k">Servidores caídos</span><span class="v num">'+down.length+' <span class="sub">de '+S.servers.length+'</span></span></div>'+
+      '<div class="tile wide"><span class="k">Ingreso mensual estimado</span><span class="v num">'+money(act*S.price)+'</span></div>'
+     :'<div class="tile '+(S.me.credits?"acc":"warn")+'"><span class="k">Tus créditos</span><span class="v num">'+S.me.credits+'</span></div>')+
+  '</div>'+
+  '<div class="two">'+
+   '<section class="card"><h2>Avisos</h2>'+al.map(function(a){return '<div class="alert '+a[0]+'"><span class="dot"></span><span>'+a[1]+'</span></div>'}).join("")+'</section>'+
+   '<section class="card"><h2>Vencimientos, próximos 14 días</h2><div class="bars">'+bars+'</div><div class="barlab">'+labs+'</div><div class="sub">Cada barra es un día del mes. En naranja, los que vencen en 3 días o menos.</div>'+
+   (porV.length?'<div class="row">'+porV.map(function(c){return '<button class="btn sm" data-act="renew" data-id="'+c.id+'">Renovar '+esc(c.user)+'</button>'}).join("")+'</div>':'')+'</section>'+
+  '</div>';
+}
+
+/* ---------- Clientes ---------- */
+function vClientes(){
+  var f=[["todos","Todos"],["act","Activos"],["pv","Por vencer"],["ven","Vencidos"],["sus","Suspendidos"]];
+  return head("Clientes",S.clients.length+" cuentas SSH"+(isAdmin()?"":" · "+S.me.credits+" créditos"),'<div class="row"><button class="btn" data-act="trial">Prueba 1 día</button><button class="btn pri" data-act="newClient">+ Nuevo</button></div>')+
+  '<div class="row"><input class="search" id="q" type="search" placeholder="Buscar usuario, servidor o nota" value="'+esc(q)+'" aria-label="Buscar cliente"></div>'+
+  '<div class="chips">'+f.map(function(x){return '<button class="chip" data-filt="'+x[0]+'" aria-pressed="'+(filt===x[0])+'">'+x[1]+'</button>'}).join("")+'</div>'+
+  '<div class="list" id="clist"></div>';
+}
+function drawClients(){
+  var el=$("#clist");if(!el||!S)return;var qq=q.trim().toLowerCase();
+  var L=S.clients.filter(function(c){
+    if(filt!=="todos"&&st(c)!==filt)return false;
+    if(!qq)return true;var s=srv(c.server);
+    return (c.user+" "+(s?s.name:"")+" "+c.note+" "+c.ownerName).toLowerCase().indexOf(qq)>=0;
+  });
+  if(!L.length){el.innerHTML='<div class="empty">'+(S.clients.length?"No hay clientes con ese filtro.":(S.servers.length?"Todavía no hay cuentas SSH. Creá la primera con + Nuevo.":"Primero agregá tu VPS en Servidores."))+'</div>';return}
+  el.innerHTML=L.map(function(c){var s=srv(c.server);
+    return '<article class="item"><div class="head"><div class="name"><span class="live'+(c.online?"":" off")+'"></span><span class="mono">'+esc(c.user)+'</span></div>'+pillFor(c)+'</div>'+
+    '<div class="meta"><span>Servidor <b>'+esc(s?s.name:"sin servidor")+'</b></span><span>Vence <b class="num">'+fdate(c.exp)+'</b></span><span>En línea <b class="num">'+c.online+' de '+c.limit+'</b></span>'+(c.ownerName?'<span>Revendedor <b>'+esc(c.ownerName)+'</b></span>':'')+(c.trial?'<span class="tag">prueba</span>':'')+(c.note?'<span>Nota <b>'+esc(c.note)+'</b></span>':'')+'</div>'+
+    '<div class="row"><button class="btn sm pri" data-act="renew" data-id="'+c.id+'">Renovar</button><button class="btn sm" data-act="copy" data-id="'+c.id+'">Copiar datos</button><button class="btn sm" data-act="editClient" data-id="'+c.id+'">Editar</button><button class="btn sm" data-act="toggleClient" data-id="'+c.id+'">'+(c.suspended?"Activar":"Suspender")+'</button><button class="btn sm danger" data-act="delClient" data-id="'+c.id+'">Eliminar</button></div></article>'}).join("");
+}
+function srvOpts(sel){var g={},o="";S.servers.forEach(function(s){var c=s.cat||"General";(g[c]=g[c]||[]).push(s)});
+  Object.keys(g).forEach(function(c){o+='<optgroup label="'+esc(c)+'">'+g[c].map(function(s){return '<option value="'+s.id+'"'+(String(s.id)===String(sel)?" selected":"")+'>'+esc(s.name)+(s.known&&!s.up?" (caído)":"")+'</option>'}).join("")+'</optgroup>'});return o}
+function newClientForm(trial){
+  if(!S.servers.length){toast(isAdmin()?"Primero agregá un servidor.":"Todavía no hay servidores cargados.");return}
+  var A=isAdmin();
+  sheet(trial?"Cuenta SSH de prueba":"Nueva cuenta SSH",
+   '<div class="f"><label for="fUser">Usuario</label><input id="fUser" class="mono" autocomplete="off" autocapitalize="off" maxlength="24"></div>'+
+   '<div class="f"><label for="fPass">Contraseña</label><div class="row"><input id="fPass" class="mono" style="flex:1;width:auto" value="'+genPass()+'" autocomplete="off"><button type="button" class="btn" data-act="regen">Generar</button></div></div>'+
+   '<div class="f"><label for="fSrv">VPS</label><select id="fSrv">'+srvOpts()+'</select></div>'+
+   '<div class="f2"><div class="f"><label for="fDays">Días</label><input id="fDays" type="number" min="1" max="365" value="'+(trial?1:S.defDays)+'" inputmode="numeric"'+(trial?" readonly":"")+'></div>'+
+   '<div class="f"><label for="fLim">Conexiones</label><input id="fLim" type="number" min="1" max="10" value="1" inputmode="numeric"'+(trial&&!A?" readonly":"")+'></div></div>'+
+   (A?'':'<div class="hint">'+(trial?"La prueba de 1 día no gasta créditos. Tenés "+S.trialsPerDay+" por día.":"Cuesta 1 crédito por conexión cada 30 días. Te quedan "+S.me.credits+".")+'</div>')+
+   '<div class="f"><label for="fNote">Nota (teléfono, nombre real)</label><input id="fNote" maxlength="60"></div>',
+   "Crear cuenta",
+   async function(){
+     var u=$("#fUser").value.trim().toLowerCase();
+     if(!/^[a-z][a-z0-9_-]{2,23}$/.test(u))return "El usuario lleva 3 a 24 caracteres: minúsculas, números o guion, y empieza con letra.";
+     await api("client/create",{user:u,pass:$("#fPass").value.trim(),server:$("#fSrv").value,days:$("#fDays").value,limit:$("#fLim").value,note:$("#fNote").value});
+     toast("Cuenta "+u+" creada en el servidor");
+   });
+}
+function editClientForm(c){
+  var A=isAdmin();
+  sheet("Editar "+c.user,
+   '<div class="f"><label for="ePass">Contraseña'+(c.pass?"":" (no registrada: escribí una nueva para cambiarla)")+'</label><div class="row"><input id="ePass" class="mono" style="flex:1;width:auto" value="'+esc(c.pass)+'" autocomplete="off"><button type="button" class="btn" data-act="regenE">Generar</button></div></div>'+
+   (A?'<div class="f2"><div class="f"><label for="eExp">Vence el</label><input id="eExp" type="date" value="'+esc(c.exp)+'"></div><div class="f"><label for="eLim">Conexiones</label><input id="eLim" type="number" min="1" max="10" value="'+c.limit+'" inputmode="numeric"></div></div>':'')+
+   '<div class="f"><label for="eNote">Nota</label><input id="eNote" value="'+esc(c.note)+'" maxlength="60"></div>',
+   "Guardar cambios",
+   async function(){var b={id:c.id,pass:$("#ePass").value.trim(),note:$("#eNote").value};
+     if(A){b.exp=$("#eExp").value;b.limit=$("#eLim").value}
+     await api("client/update",b);toast("Cliente actualizado")});
+}
+function renewForm(c){
+  sheet("Renovar "+c.user,'<div class="meta"><span>Estado actual '+pillFor(c)+'</span><span>Vence <b>'+fdate(c.exp)+'</b></span></div>'+
+   '<div class="f"><label for="rDays">Días a sumar</label><select id="rDays"><option value="7">7 días</option><option value="15">15 días</option><option value="30" selected>30 días</option><option value="60">60 días</option><option value="90">90 días</option></select></div>'+
+   '<div class="hint">'+(isAdmin()?"":"Cuesta 1 crédito por conexión cada 30 días. Te quedan "+S.me.credits+". ")+'Si ya venció, los días cuentan desde hoy.</div>',
+   "Renovar",async function(){var r=await api("client/renew",{id:c.id,days:$("#rDays").value});toast(c.user+" renovado hasta "+fdate(r.exp))});
+}
+
+/* ---------- En vivo ---------- */
+function vVivo(){
+  var on=S.clients.filter(function(c){return c.online>0}).sort(function(a,b){return b.online-a.online}),tot=0;
+  on.forEach(function(c){tot+=c.online});
+  return head("En vivo",tot+(tot===1?" conexión":" conexiones")+" de "+on.length+(on.length===1?" cliente":" clientes")+" · se actualiza solo")+
+  '<div class="row">'+S.servers.map(function(s){return '<span class="pill '+(!s.known?"mut":s.up?"ok":"crit")+'"><span class="live'+(s.up?"":" off")+'"></span>'+esc(s.name)+(isAdmin()&&s.up?" · "+s.online:"")+'</span>'}).join("")+'</div>'+
+  '<div class="list">'+(on.length?on.map(function(c){var s=srv(c.server),p=Math.min(100,Math.round(c.online/c.limit*100));
+    return '<article class="item"><div class="head"><div class="name"><span class="live"></span><span class="mono">'+esc(c.user)+'</span></div><span class="pill '+(c.online>=c.limit?"warn":"ok")+' num">'+c.online+' de '+c.limit+'</span></div>'+
+    '<div class="meter'+(p>=100?" hot":"")+'"><i style="width:'+p+'%"></i></div>'+
+    '<div class="meta"><span>Servidor <b>'+esc(s?s.name:"-")+'</b></span><span>Vence <b class="num">'+fdate(c.exp)+'</b></span>'+(c.ownerName?'<span>Revendedor <b>'+esc(c.ownerName)+'</b></span>':'')+'</div>'+
+    '<div class="row"><button class="btn sm danger" data-act="toggleClient" data-id="'+c.id+'">Suspender y desconectar</button></div></article>'}).join(""):'<div class="empty">Nadie conectado en este momento.</div>')+'</div>'+
+  '<div class="sub">El panel corta solo las conexiones que pasan el límite, las de cuentas vencidas y las suspendidas.</div>';
+}
+
+/* ---------- Servidores (solo administrador) ---------- */
+var CATS=["General","Premium","Streaming","Gaming","Pruebas"];
+function vServidores(){
+  return head("Servidores",S.servers.filter(function(s){return s.up}).length+" en línea de "+S.servers.length,'<button class="btn pri" data-act="newServer">+ Agregar VPS</button>')+
+  '<div class="list">'+(S.servers.length?S.servers.map(function(s){
+    var p=Math.min(100,Math.round(s.accounts/s.cap*100)),lp=Math.min(100,Math.round(s.load/s.cpus*100));
+    return '<article class="item"><div class="head"><div class="name">'+esc(s.name)+'</div>'+(!s.known?'<span class="pill mut">Comprobando</span>':s.up?'<span class="pill ok">En línea</span>':'<span class="pill crit">Caído</span>')+'</div>'+
+    '<div class="meta"><span class="mono">'+(s.kind==="local"?"este VPS":esc(s.suser)+"@"+esc(s.host)+":"+s.port)+'</span>'+(s.loc?'<span>'+esc(s.loc)+'</span>':'')+'<span class="tag">'+esc(s.cat)+'</span><span>Revisión cada <b class="num">'+s.poll+' s</b></span></div>'+
+    (s.known&&!s.up&&s.err?'<div class="alert crit"><span class="dot"></span><span>'+esc(s.err)+'</span></div>':'')+
+    (s.up?'<div class="f2"><div><div class="meta" style="justify-content:space-between"><span>CPU</span><span class="num"><b>'+lp+'%</b></span></div><div class="meter'+(lp>=85?" hot":"")+'"><i style="width:'+lp+'%"></i></div></div>'+
+      '<div><div class="meta" style="justify-content:space-between"><span>RAM</span><span class="num"><b>'+s.mem+'%</b></span></div><div class="meter'+(s.mem>=85?" hot":"")+'"><i style="width:'+s.mem+'%"></i></div></div></div>':'')+
+    '<div><div class="meta" style="justify-content:space-between"><span>Cuentas</span><span class="num"><b>'+s.accounts+'</b> de '+s.cap+' · <b>'+s.online+'</b> conectadas</span></div><div class="meter'+(p>=85?" hot":"")+'"><i style="width:'+p+'%"></i></div></div>'+
+    '<div class="row"><button class="btn sm" data-act="editServer" data-id="'+s.id+'">Editar</button><button class="btn sm'+(s.known&&!s.up?" pri":"")+'" data-act="reconnect" data-id="'+s.id+'">Reconectar</button><button class="btn sm" data-act="syncServer" data-id="'+s.id+'">Importar cuentas</button><button class="btn sm danger" data-act="delServer" data-id="'+s.id+'">Quitar</button></div></article>'}).join(""):'<div class="empty">Todavía no cargaste servidores.</div>')+'</div>';
+}
+function perfHtml(poll){var m=poll===5?"f":poll===15?"d":"m";
+  return '<div class="f"><span class="lab">Rendimiento</span><div class="seg"><label><input type="radio" name="perf" value="f"'+(m==="f"?" checked":"")+'>Máquina fuerte</label><label><input type="radio" name="perf" value="d"'+(m==="d"?" checked":"")+'>Máquina débil</label><label><input type="radio" name="perf" value="m"'+(m==="m"?" checked":"")+'>A mano</label></div>'+
+  '<div class="f" id="pollBox"'+(m==="m"?"":" hidden")+'><label for="sPoll">Revisar cada (segundos, de 3 a 300)</label><input id="sPoll" type="number" min="3" max="300" value="'+poll+'" inputmode="numeric"></div>'+
+  '<div class="hint" id="perfHint"></div></div>'}
+function perfVal(){var v=$('input[name="perf"]:checked').value;return v==="f"?5:v==="d"?15:parseInt($("#sPoll").value,10)||0}
+function perfSync(){var v=$('input[name="perf"]:checked');if(!v)return;$("#pollBox").hidden=v.value!=="m";
+  $("#perfHint").textContent=v.value==="f"?"Revisa sesiones y carga cada 5 s. Para VPS con CPU de sobra.":v.value==="d"?"Revisa cada 15 s. Gasta menos CPU en VPS chicos; los datos en vivo llegan un poco más tarde.":"Vos elegís cada cuántos segundos se revisa el VPS."}
+function catList(){var c=CATS.slice();S.servers.forEach(function(s){if(s.cat&&c.indexOf(s.cat)<0)c.push(s.cat)});return c}
+function catField(sel){return '<div class="f"><label for="sCat">Categoría</label><input id="sCat" list="catDl" value="'+esc(sel||"")+'" placeholder="Elegí o escribí una" maxlength="20" autocomplete="off"><datalist id="catDl">'+catList().map(function(c){return '<option value="'+esc(c)+'">'}).join("")+'</datalist></div>'}
+function newServerForm(){
+  sheet("Agregar VPS",
+   '<div class="f2"><div class="f"><label for="sName">Nombre</label><input id="sName" placeholder="Ej. Argentina 1" maxlength="30"></div>'+catField("General")+'</div>'+
+   '<div class="f21"><div class="f"><label for="sHost">IP o dominio</label><input id="sHost" class="mono" placeholder="45.12.34.56" autocapitalize="off" autocomplete="off" inputmode="url"></div><div class="f"><label for="sPort">Puerto SSH</label><input id="sPort" class="mono" type="number" value="22" min="1" max="65535" inputmode="numeric"></div></div>'+
+   '<div class="f12"><div class="f"><label for="sUser">Usuario</label><input id="sUser" class="mono" value="root" autocapitalize="off" autocomplete="off"></div><div class="f"><label for="sPw">Contraseña de root</label><input id="sPw" type="password" autocomplete="new-password"></div></div>'+
+   '<div class="hint">El panel entra una sola vez con esta contraseña, deja su llave en el VPS y no guarda la contraseña. Tarda unos segundos.</div>',
+   "Conectar VPS",
+   async function(){
+     var host=$("#sHost").value.trim().replace(/^[a-z]+:\/\//i,"").replace(/\/.*$/,"");
+     if(!$("#sName").value.trim())return "Ponele un nombre al VPS.";
+     if(!host)return "Cargá la IP o el dominio del VPS.";
+     if(!$("#sPw").value)return "Escribí la contraseña de root.";
+     await api("server/add",{name:$("#sName").value,host:host,port:$("#sPort").value,suser:$("#sUser").value.trim()||"root",password:$("#sPw").value,cat:$("#sCat").value.trim()||"General",cap:500,poll:5,loc:""});
+     toast("VPS conectado. Ya podés crear cuentas SSH en él.");
+   });
+}
+function reconnectForm(s){
+  sheet("Reconectar "+s.name,
+   '<div class="meta"><span class="mono">'+esc(s.suser)+'@'+esc(s.host)+'</span></div>'+
+   '<div class="f12"><div class="f"><label for="rPort">Puerto SSH</label><input id="rPort" class="mono" type="number" value="'+s.port+'" min="1" max="65535" inputmode="numeric"></div><div class="f"><label for="rPw">Contraseña de '+esc(s.suser)+'</label><input id="rPw" type="password" autocomplete="new-password"></div></div>'+
+   '<div class="hint">Usalo si reinstalaste el VPS, cambiaste el puerto o el panel perdió el acceso. Las cuentas cargadas no se tocan.</div>',
+   "Reconectar",async function(){if(!$("#rPw").value)return "Escribí la contraseña.";await api("server/reconnect",{id:s.id,port:$("#rPort").value,password:$("#rPw").value});toast("VPS reconectado")});
+}
+function editServerForm(s){
+  sheet("Editar "+s.name,
+   '<div class="f21"><div class="f"><label for="sName">Nombre</label><input id="sName" value="'+esc(s.name)+'" maxlength="30"></div><div class="f"><label for="sLoc">País</label><input id="sLoc" value="'+esc(s.loc)+'" maxlength="20"></div></div>'+
+   '<div class="f2">'+catField(s.cat)+'<div class="f"><label for="sCap">Cuentas máximas</label><input id="sCap" type="number" min="1" value="'+s.cap+'" inputmode="numeric"></div></div>'+perfHtml(s.poll),
+   "Guardar cambios",async function(){var poll=perfVal();if(poll<3||poll>300)return "El intervalo va de 3 a 300 segundos.";
+     await api("server/update",{id:s.id,name:$("#sName").value,loc:$("#sLoc").value,cat:$("#sCat").value.trim()||"General",cap:$("#sCap").value,poll:poll});toast("Servidor actualizado")});
+  perfSync();
+}
+
+/* ---------- Más: revendedores, ajustes, cuenta ---------- */
+function vMas(){
+  var A=isAdmin(),h=head("Más",esc(S.me.name)+" · "+(A?"administrador":"revendedor"));
+  if(A){
+    h+='<section class="card"><div class="top"><h2>Revendedores</h2><button class="btn sm pri" data-act="newReseller">+ Nuevo</button></div><div class="sub">1 crédito = 30 días de una conexión. Cada revendedor entra al panel con su usuario y ve solo sus clientes.</div><div class="list">'+
+    (S.resellers.length?S.resellers.map(function(r){var mine=S.clients.filter(function(c){return c.owner===r.id}).length;
+      return '<article class="item" style="background:var(--surface2)"><div class="head"><div class="name">'+esc(r.name)+' <span class="tag">'+esc(r.username)+'</span></div>'+(r.suspended?'<span class="pill mut">Suspendido</span>':r.credits===0?'<span class="pill warn">Sin créditos</span>':'<span class="pill info num">'+r.credits+' créditos</span>')+'</div>'+
+      '<div class="meta"><span>Clientes <b class="num">'+mine+'</b></span></div>'+
+      '<div class="row"><button class="btn sm pri" data-act="credits" data-id="'+r.id+'">Cargar créditos</button><button class="btn sm" data-act="rslPass" data-id="'+r.id+'">Cambiar clave</button><button class="btn sm" data-act="toggleReseller" data-id="'+r.id+'">'+(r.suspended?"Activar":"Suspender")+'</button><button class="btn sm danger" data-act="delReseller" data-id="'+r.id+'">Eliminar</button></div></article>'}).join(""):'<div class="empty">Todavía no tenés revendedores.</div>')+'</div></section>'+
+    '<section class="card"><h2>Tu panel</h2><div class="f"><label for="aBrand">Nombre del panel</label><input id="aBrand" value="'+esc(S.brand)+'" maxlength="24"></div>'+
+    '<div class="f2"><div class="f"><label for="aPrice">Precio por mes ($)</label><input id="aPrice" type="number" min="0" value="'+S.price+'" inputmode="numeric"></div><div class="f"><label for="aDays">Días por defecto</label><input id="aDays" type="number" min="1" max="365" value="'+S.defDays+'" inputmode="numeric"></div></div>'+
+    '<div class="f"><label for="aTrials">Pruebas gratis por día para cada revendedor</label><input id="aTrials" type="number" min="0" value="'+S.trialsPerDay+'" inputmode="numeric"></div>'+
+    '<div class="row"><button class="btn pri" data-act="saveCfg">Guardar</button></div></section>';
+  }else{
+    h+='<section class="card"><h2>Tus créditos</h2><div class="tile '+(S.me.credits?"acc":"warn")+'" style="border-radius:10px"><span class="k">Disponibles</span><span class="v num">'+S.me.credits+'</span></div><div class="sub">1 crédito = 30 días de una conexión. Las cargas las hace el administrador.</div></section>';
+  }
+  return h+'<section class="card"><h2>Tu cuenta</h2><div class="meta"><span>Usuario <b class="mono">'+esc(S.me.username)+'</b></span></div><div class="row"><button class="btn" data-act="myPass">Cambiar contraseña</button><button class="btn danger" data-act="logout">Cerrar sesión</button></div></section>';
+}
+
+/* ---------- Hoja y confirmación ---------- */
+var onOk=null;
+function sheet(title,body,okLabel,fn,danger){
+  onOk=fn;
+  $("#sheet").innerHTML='<h2>'+esc(title)+'</h2><form id="sf" class="f" style="gap:14px" novalidate>'+body+'<div class="err" id="serr" role="alert"></div><div class="row" style="justify-content:flex-end"><button type="button" class="btn" data-act="close">Cancelar</button><button type="submit" class="btn '+(danger?"danger":"pri")+'">'+esc(okLabel)+'</button></div></form>';
+  $("#ov").classList.add("on");
+  var i=$("#sheet input:not([type=radio]),#sheet select,#sheet textarea");if(i&&!danger)try{i.focus()}catch(e){}
+}
+function confirmDo(title,msg,label,fn){sheet(title,'<div>'+msg+'</div>',label,fn,true)}
+function closeSheet(){$("#ov").classList.remove("on");onOk=null}
+function showText(title,txt){sheet(title,'<pre class="code">'+esc(txt)+'</pre><div class="hint">Mantené apretado el texto para copiarlo.</div>',"Listo",async function(){})}
+function copyText(txt,title,ok){try{navigator.clipboard.writeText(txt).then(function(){toast(ok)},function(){showText(title,txt)})}catch(x){showText(title,txt)}}
+
+document.addEventListener("submit",async function(e){
+  e.preventDefault();
+  if(e.target.id==="lf"){var b0=e.target.querySelector("[type=submit]");b0.disabled=true;$("#lErr").textContent="";
+    try{await api("login",{username:$("#lUser").value,password:$("#lPass").value});$("#lPass").value="";S=await api("state");tab="inicio";showApp();render()}catch(x){$("#lErr").textContent=x.message}
+    b0.disabled=false;return}
+  if(e.target.id!=="sf"||!onOk)return;
+  var b=e.target.querySelector("[type=submit]"),lab=b.textContent,r;
+  b.disabled=true;b.textContent="Un momento…";$("#serr").textContent="";
+  try{r=await onOk()}catch(x){r=x.message||"Algo falló. Probá de nuevo."}
+  if(typeof r==="string"){if($("#serr")){$("#serr").textContent=r;b.disabled=false;b.textContent=lab}return}
+  closeSheet();await refresh(true);
+});
+document.addEventListener("input",function(e){if(e.target.id==="q"){q=e.target.value;drawClients()}});
+document.addEventListener("change",function(e){if(e.target.name==="perf")perfSync()});
+$("#ov").addEventListener("click",function(e){if(e.target.id==="ov")closeSheet()});
+document.addEventListener("keydown",function(e){if(e.key==="Escape")closeSheet()});
+
+document.addEventListener("click",function(e){
+  var t=e.target.closest("[data-tab],[data-filt],[data-act]");if(!t||!S)return;
+  if(t.dataset.tab){go(t.dataset.tab,true);return}
+  if(t.dataset.filt){filt=t.dataset.filt;render();return}
+  var a=t.dataset.act,id=t.dataset.id,c,s,r;
+  switch(a){
+   case "close":closeSheet();break;
+   case "regen":$("#fPass").value=genPass();break;
+   case "regenE":$("#ePass").value=genPass();break;
+   case "newClient":newClientForm(false);break;
+   case "trial":newClientForm(true);break;
+   case "editClient":editClientForm(cli(id));break;
+   case "renew":renewForm(cli(id));break;
+   case "toggleClient":c=cli(id);act(function(){return api("client/suspend",{id:c.id,on:!c.suspended})},c.user+(c.suspended?" activado":" suspendido y desconectado"));break;
+   case "delClient":c=cli(id);confirmDo("Eliminar cliente","Se borra la cuenta <b class=\"mono\">"+esc(c.user)+"</b> del panel y del servidor. No se puede deshacer.","Eliminar",async function(){await api("client/delete",{id:c.id});toast("Cliente eliminado")});break;
+   case "copy":c=cli(id);s=srv(c.server);
+     copyText(S.brand+"\nUsuario: "+c.user+"\nContraseña: "+(c.pass||"(no registrada)")+(s&&s.host&&s.host!=="local"?"\nHost: "+s.host+"\nPuerto SSH: "+s.port:"")+"\nConexiones: "+c.limit+"\nVence: "+fdate(c.exp),"Datos de "+c.user,"Datos copiados");break;
+   case "newServer":newServerForm();break;
+   case "editServer":editServerForm(srv(id));break;
+   case "reconnect":reconnectForm(srv(id));break;
+   case "syncServer":s=srv(id);confirmDo("Importar cuentas","Trae al panel las cuentas que ya existen en <b>"+esc(s.name)+"</b> y no tienen acceso a consola. No cambia nada en el servidor.","Importar",async function(){var x=await api("server/sync",{id:s.id});toast(x.imported?x.imported+" cuentas importadas":"No había cuentas nuevas para importar")});
+     $("#sheet [type=submit]").className="btn pri";break;
+   case "delServer":s=srv(id);confirmDo("Quitar servidor","Se quita <b>"+esc(s.name)+"</b> del panel. El VPS no se toca.","Quitar",async function(){await api("server/delete",{id:s.id});toast("Servidor quitado")});break;
+   case "newReseller":sheet("Nuevo revendedor",'<div class="f"><label for="nName">Nombre</label><input id="nName" maxlength="30"></div><div class="f2"><div class="f"><label for="nUser">Usuario para entrar</label><input id="nUser" class="mono" autocapitalize="off" autocomplete="off" maxlength="24"></div><div class="f"><label for="nPass">Contraseña</label><input id="nPass" class="mono" value="'+genPass()+genPass().slice(0,2)+'" autocomplete="off"></div></div><div class="f"><label for="nCred">Créditos iniciales</label><input id="nCred" type="number" min="0" value="10" inputmode="numeric"></div>',"Crear revendedor",async function(){await api("reseller/create",{name:$("#nName").value,username:$("#nUser").value.trim(),password:$("#nPass").value,credits:$("#nCred").value});toast("Revendedor creado")});break;
+   case "credits":r=rsl(id);sheet("Créditos de "+r.name,'<div class="meta"><span>Saldo actual <b class="num">'+r.credits+'</b></span></div><div class="f"><label for="cAdd">Créditos a sumar (negativo para quitar)</label><input id="cAdd" type="number" value="10" inputmode="numeric"></div>',"Aplicar",async function(){await api("reseller/credits",{id:r.id,delta:$("#cAdd").value});toast("Créditos actualizados")});break;
+   case "rslPass":r=rsl(id);sheet("Clave de "+r.name,'<div class="f"><label for="pNew">Contraseña nueva (8 o más)</label><input id="pNew" class="mono" value="'+genPass()+genPass().slice(0,2)+'" autocomplete="off"></div>',"Cambiar clave",async function(){await api("reseller/password",{id:r.id,password:$("#pNew").value});toast("Clave cambiada")});break;
+   case "toggleReseller":r=rsl(id);act(function(){return api("reseller/suspend",{id:r.id,on:!r.suspended})},r.name+(r.suspended?" activado":" suspendido"));break;
+   case "delReseller":r=rsl(id);confirmDo("Eliminar revendedor","Se borra <b>"+esc(r.name)+"</b>. Sus clientes siguen funcionando y pasan a ser tuyos.","Eliminar",async function(){await api("reseller/delete",{id:r.id});toast("Revendedor eliminado")});break;
+   case "saveCfg":act(function(){return api("settings",{brand:$("#aBrand").value,price:$("#aPrice").value,defDays:$("#aDays").value,trialsPerDay:$("#aTrials").value})},"Ajustes guardados");break;
+   case "myPass":sheet("Cambiar contraseña",'<div class="f"><label for="pOld">Contraseña actual</label><input id="pOld" type="password" autocomplete="current-password"></div><div class="f"><label for="pNew2">Contraseña nueva (8 o más)</label><input id="pNew2" type="password" autocomplete="new-password"></div>',"Cambiar",async function(){await api("password",{old:$("#pOld").value,"new":$("#pNew2").value});toast("Contraseña cambiada")});break;
+   case "logout":api("logout",{}).then(showLogin,showLogin);break;
+  }
+});
+
+function go(t,push){if(!tabs().some(function(x){return x[0]===t}))t="inicio";tab=t;if(push){try{history.replaceState(null,"","#"+t)}catch(e){}}render();$("#main").scrollTop=0}
+(async function boot(){
+  try{var r=await fetch("/api/state",{credentials:"same-origin"});if(!r.ok)throw 0;S=await r.json();tab=location.hash.slice(1)||"inicio";showApp();go(tab)}
+  catch(e){showLogin()}
+})();
+})();
+</script>
+</body>
+</html>
